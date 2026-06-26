@@ -169,17 +169,13 @@ export function renderPins(dataset, onSelect, onCluster) {
   }
 }
 
-// A person pin: a circular photo (if they have one) or a coloured dot, plus a
-// name label underneath.
+// A person pin: a coloured teardrop dot with a name label underneath.
 function addPersonMarker(person, kind, onClick) {
   const label = person.name || (kind === 'self' ? 'You' : 'Unnamed');
-  const head = person.picture
-    ? `<div class="wwt-photo"><img src="${escapeHtml(person.picture)}" alt="" /></div>`
-    : '<span class="wwt-pin-dot"></span>';
   const icon = L.divIcon({
     className: '',
     html: `<div class="wwt-pin wwt-pin-${kind}" title="${escapeHtml(label)}">
-             ${head}
+             <span class="wwt-pin-dot"></span>
              <span class="wwt-pin-label">${escapeHtml(label)}</span>
            </div>`,
     iconSize: [0, 0], iconAnchor: [0, 0],

@@ -25,10 +25,6 @@ export function notificationsAvailable() {
   return 'Notification' in window;
 }
 
-export function notificationPermission() {
-  return notificationsAvailable() ? Notification.permission : 'denied';
-}
-
 export async function askNotificationPermission() {
   if (!notificationsAvailable()) return 'denied';
   if (Notification.permission === 'granted') return 'granted';

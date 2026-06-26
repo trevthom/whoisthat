@@ -27,7 +27,7 @@
     <div class="login-card">
       <div class="brand">
         <span class="brand-lock" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1.1" fill="currentColor" stroke="none"/><path d="M8.5 14.5a4.2 4.2 0 0 0 7 0"/></svg>
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor"><circle cx="12" cy="7" r="4.4"/><path d="M12 12.2c-4.2 0-7.6 2.9-7.9 6.6-.05.66.49 1.2 1.15 1.2h13.5c.66 0 1.2-.54 1.15-1.2-.3-3.7-3.7-6.6-7.9-6.6z"/></svg>
         </span>
         <h1>WhoIsThat</h1>
       </div>
@@ -57,18 +57,24 @@
 
       <div class="login-pane hidden" data-pane="existing">
         <label class="field-label" for="nsec-input">Your secret key</label>
-        <input id="nsec-input" class="input mono" type="password" placeholder="nsec1… or 64-character hex" autocomplete="off" />
+        <input id="nsec-input" class="input mono" type="password" placeholder="nsec1…" autocomplete="off" />
         <button id="btn-toggle-nsec" class="btn btn-ghost small">Show</button>
         <button id="btn-login-existing" class="btn btn-primary block">Log in</button>
       </div>
 
-      <div class="relay-status-block">
-        <div class="relay-status-head">
-          <span>Relays</span>
-          <button id="btn-edit-relays-login" class="btn btn-ghost xsmall">Edit</button>
+      <label class="checkbox stay-checkbox">
+        <input type="checkbox" id="stay-logged-in" />
+        <span>Keep me logged in on this device</span>
+      </label>
+      <p class="muted xsmall stay-note">Stores your secret key in this browser so you don't have to paste it next time. Only enable this on a device that's yours.</p>
+
+      <details class="relay-status-block set-collapse">
+        <summary class="relay-status-summary"><span>Relays</span><span class="chev" aria-hidden="true"></span></summary>
+        <div class="relay-status-body">
+          <div class="relay-status-head"><button id="btn-edit-relays-login" class="btn btn-ghost xsmall">Edit relays</button></div>
+          <ul id="login-relay-list" class="relay-list"></ul>
         </div>
-        <ul id="login-relay-list" class="relay-list"></ul>
-      </div>
+      </details>
 
       <p id="login-error" class="error-text hidden"></p>
     </div>
@@ -83,7 +89,7 @@
     <header class="topbar">
       <div class="topbar-brand">
         <span class="brand-lock small" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1.2" fill="currentColor" stroke="none"/><path d="M8.5 14.5a4.2 4.2 0 0 0 7 0"/></svg>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><circle cx="12" cy="7" r="4.4"/><path d="M12 12.2c-4.2 0-7.6 2.9-7.9 6.6-.05.66.49 1.2 1.15 1.2h13.5c.66 0 1.2-.54 1.15-1.2-.3-3.7-3.7-6.6-7.9-6.6z"/></svg>
         </span>
         <span>WhoIsThat</span>
       </div>

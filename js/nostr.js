@@ -58,10 +58,6 @@ export function getNsec() {
   const { secretKey } = getState();
   return secretKey ? nip19.nsecEncode(secretKey) : '';
 }
-export function getNpub() {
-  const { pubkey } = getState();
-  return pubkey ? nip19.npubEncode(pubkey) : '';
-}
 
 // --- Conversions people will need ----------------------------------------
 
@@ -88,10 +84,6 @@ export function decryptFromSelf(ciphertext) {
   const { secretKey, pubkey } = getState();
   const key = nip44.getConversationKey(secretKey, pubkey);
   return nip44.decrypt(ciphertext, key);
-}
-export async function encryptFor(peerHex, plaintext) {
-  const { secretKey } = getState();
-  return nip04.encrypt(secretKey, peerHex, plaintext);
 }
 export async function decryptFrom(peerHex, ciphertext) {
   const { secretKey } = getState();

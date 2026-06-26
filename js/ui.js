@@ -13,7 +13,7 @@ import { RELATIVE_TYPES, emptyCard, emptyRelative, getPerson, getPendingMerge } 
 import { hexToNpub, isValidNpub, getNsec } from './nostr.js';
 import * as map from './map.js';
 import { totalUnread } from './chat.js';
-import { FOOTER_LINKS, ISSUES_GITHUB_URL, ISSUES_CONTACT_NPUB } from './config.js';
+import { FOOTER_LINKS, ISSUES_GITHUB_URL, ISSUES_CONTACT_NPUB, DONATE_SPARK, DONATE_STRIKE } from './config.js';
 import { searchAddress } from './geocode.js';
 
 let A = {};                 // actions, injected by app.js
@@ -62,6 +62,9 @@ function renderFooters() {
       } else if (link.action === 'issues') {
         a.href = '#';
         a.addEventListener('click', (e) => { e.preventDefault(); openIssuesModal(); });
+      } else if (link.action === 'donate') {
+        a.href = '#';
+        a.addEventListener('click', (e) => { e.preventDefault(); openDonateModal(); });
       } else if (!link.url || link.url === '#') {
         a.addEventListener('click', (e) => { e.preventDefault(); toast(`${link.label} — coming soon`); });
       } else {
@@ -111,14 +114,27 @@ function openIssuesModal() {
   openModal(node);
 }
 
+function openDonateModal() {
+  const node = h(`<div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head"><h2>Donate</h2><button class="x-btn" data-x>×</button></div>
+    <div class="modal-body donate-body">
+      <p class="donate-title">Donations appreciated!</p>
+      <p class="donate-addr mono" id="donate-spark" title="Tap to copy">${escapeHtml(DONATE_SPARK)}</p>
+      <p class="donate-strike" id="donate-strike" title="Tap to copy">${escapeHtml(DONATE_STRIKE)}</p>
+    </div>
+  </div>`);
+  node.querySelector('#donate-spark').onclick = () => { navigator.clipboard?.writeText(DONATE_SPARK); toast('Address copied'); };
+  node.querySelector('#donate-strike').onclick = () => { navigator.clipboard?.writeText(DONATE_STRIKE); toast('Copied'); };
+  node.querySelectorAll('[data-x]').forEach((b) => b.onclick = closeModal);
+  openModal(node);
+}
+
 // Tapping a "N pins" cluster lists the people at that address to choose from.
 export function openClusterList(people) {
   const body = h('<div class="people-list"></div>');
   for (const p of people) {
     const row = h(`<div class="person-row">
-      ${p.picture
-        ? `<img class="person-avatar" src="${escapeHtml(p.picture)}" alt="" />`
-        : `<div class="person-avatar">${escapeHtml(initials(p.name))}</div>`}
+      <div class="person-avatar">${escapeHtml(initials(p.name))}</div>
       <div class="person-meta">
         <div class="name">${escapeHtml(p.name || 'Unnamed')}</div>
         <div class="sub">${escapeHtml(p.knownFrom || 'Pinned here')}</div>
@@ -285,9 +301,7 @@ export function openPeoplePanel() {
     for (const p of people) {
       const hasMerge = !!getState().pendingMerges[p.id];
       const row = h(`<div class="person-row ${hasMerge ? 'has-merge' : ''}">
-        ${p.picture
-          ? `<img class="person-avatar" src="${escapeHtml(p.picture)}" alt="" />`
-          : `<div class="person-avatar">${escapeHtml(initials(p.name))}</div>`}
+        <div class="person-avatar">${escapeHtml(initials(p.name))}</div>
         <div class="person-meta">
           <div class="name">${escapeHtml(p.name || 'Unnamed')}${hasMerge ? '<span class="merge-dot" title="A shared update is ready to merge"></span>' : ''}</div>
           <div class="sub">${hasMerge ? 'Tap to review &amp; merge a shared update' : escapeHtml(p.knownFrom || (p.location ? 'Pinned on map' : 'No location'))}</div>
@@ -326,9 +340,7 @@ export function openCardView(idOrSelf) {
   const foot = node.querySelector('.modal-foot');
 
   body.appendChild(h(`<div class="card-top">
-    ${card.picture
-      ? `<img class="card-photo" src="${escapeHtml(card.picture)}" alt="" />`
-      : `<div class="card-photo placeholder">${escapeHtml(initials(card.name))}</div>`}
+    <div class="card-photo placeholder">${escapeHtml(initials(card.name))}</div>
     <div>
       <h2>${escapeHtml(card.name || 'Unnamed')}</h2>
       ${card.sharedBy ? `<div class="card-shared">shared by ${escapeHtml(shortNpub(card.sharedBy))}</div>` : ''}
@@ -337,7 +349,7 @@ export function openCardView(idOrSelf) {
 
   // Location: address with coordinates beneath it in parentheses, or just the
   // coordinates (with a pin) if there's no physical address. A small gap sits
-  // between the picture above and this block.
+  // below the name block above and this block.
   if (card.location) {
     body.appendChild(h(card.address
       ? `<div class="card-loc">
@@ -420,15 +432,6 @@ function renderEditor() {
   const node = h(`<div class="modal" role="dialog" aria-modal="true">
     <div class="modal-head"><h2>${editorIsSelf ? 'My information' : (editorId ? 'Edit person' : 'Add person')}</h2><button class="x-btn" data-x>×</button></div>
     <div class="modal-body">
-      <div class="card-top">
-        <div id="ed-photo-wrap">${photoPreview(c.picture)}</div>
-        <div style="flex:1">
-          <label class="field-label">Photo</label>
-          <input id="ed-picture-file" class="input" type="file" accept="image/*" />
-          <input id="ed-picture-url" class="input" style="margin-top:6px" placeholder="…or paste an image URL" value="${escapeHtml(isUrl(c.picture) ? c.picture : '')}" />
-        </div>
-      </div>
-
       <div class="name-row">
         <div class="name-field">
           <label class="field-label">Name</label>
@@ -466,21 +469,6 @@ function renderEditor() {
       <button class="btn btn-primary" id="ed-save">Save</button>
     </div>
   </div>`);
-
-  // photo handlers
-  node.querySelector('#ed-picture-file').addEventListener('change', async (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    try {
-      editorDraft = captureEditorForm(node);
-      editorDraft.picture = await resizeImage(file, 320);
-      renderEditor();
-    } catch { toast('Could not read that image', true); }
-  });
-  node.querySelector('#ed-picture-url').addEventListener('change', (e) => {
-    editorDraft = captureEditorForm(node);
-    if (e.target.value.trim()) editorDraft.picture = e.target.value.trim();
-    renderEditor();
-  });
 
   // location: address OR pin
   node.querySelector('#ed-pin').onclick = () => {
@@ -593,12 +581,6 @@ function captureEditorForm(node) {
   return d;
 }
 
-function photoPreview(pic) {
-  return pic
-    ? `<img class="card-photo" src="${escapeHtml(pic)}" alt="" />`
-    : `<div class="card-photo placeholder">?</div>`;
-}
-
 // --------------------------------------------------------------------------
 // Merge modal: reconcile your card with a friend's shared update
 // --------------------------------------------------------------------------
@@ -610,13 +592,11 @@ export function openMergeModal(personId) {
   const shareId = theirs.id;
   const conflicts = pend.conflicts || {};
 
-  // Only name, pets, and photo can ever need a choice — and only the ones that
-  // truly clash (both sides have data and differ). Everything else (their
-  // location/address) was already applied automatically.
+  // Only name and pets can ever need a choice — and only when they truly clash
+  // (both sides have data and differ). Their location/address is auto-applied.
   const fieldDefs = [
-    { key: 'name', label: 'Name', photo: false },
-    { key: 'pets', label: 'Pets', photo: false },
-    { key: 'picture', label: 'Photo', photo: true },
+    { key: 'name', label: 'Name' },
+    { key: 'pets', label: 'Pets' },
   ].filter((f) => conflicts[f.key] != null);
 
   if (!fieldDefs.length) { A.commitMerge(personId, deepCopy(yours), shareId); toast('Up to date'); return; }
@@ -638,42 +618,24 @@ export function openMergeModal(personId) {
   fieldDefs.forEach((f) => {
     const yv = yours[f.key] || '';
     const tv = conflicts[f.key] || '';
-    let row;
-    if (f.photo) {
-      row = h(`<div class="merge-row">
-        <div class="merge-label">Photo</div>
-        <div class="merge-cols">
-          <div class="merge-col"><div class="merge-side">Yours</div>${yv ? `<img class="merge-photo" src="${escapeHtml(yv)}" alt="" />` : '<div class="merge-val"><span class="muted">—</span></div>'}<button class="btn btn-ghost xsmall merge-keep chosen" data-side="yours" ${yv ? '' : 'disabled'}>Keep</button></div>
-          <div class="merge-col"><div class="merge-side">Theirs</div>${tv ? `<img class="merge-photo" src="${escapeHtml(tv)}" alt="" />` : '<div class="merge-val"><span class="muted">—</span></div>'}<button class="btn btn-ghost xsmall merge-keep" data-side="theirs" ${tv ? '' : 'disabled'}>Keep</button></div>
-        </div>
-      </div>`);
-      row.querySelectorAll('.merge-keep').forEach((btn) => {
-        btn.onclick = () => {
-          merged.picture = btn.dataset.side === 'yours' ? yv : tv;
-          row.querySelectorAll('.merge-keep').forEach((b) => b.classList.remove('chosen'));
-          btn.classList.add('chosen');
-        };
-      });
-    } else {
-      row = h(`<div class="merge-row">
-        <div class="merge-label">${escapeHtml(f.label)}</div>
-        <div class="merge-cols">
-          <div class="merge-col"><div class="merge-side">Yours</div><div class="merge-val">${yv ? escapeHtml(yv) : '<span class="muted">—</span>'}</div><button class="btn btn-ghost xsmall merge-keep chosen" data-side="yours" ${yv ? '' : 'disabled'}>Keep</button></div>
-          <div class="merge-col"><div class="merge-side">Theirs</div><div class="merge-val">${tv ? escapeHtml(tv) : '<span class="muted">—</span>'}</div><button class="btn btn-ghost xsmall merge-keep" data-side="theirs" ${tv ? '' : 'disabled'}>Keep</button></div>
-        </div>
-        <input class="input merge-input" value="${escapeHtml(merged[f.key] || '')}" />
-      </div>`);
-      const input = row.querySelector('.merge-input');
-      input.addEventListener('input', () => { merged[f.key] = input.value; });
-      row.querySelectorAll('.merge-keep').forEach((btn) => {
-        btn.onclick = () => {
-          const v = btn.dataset.side === 'yours' ? yv : tv;
-          merged[f.key] = v; input.value = v;
-          row.querySelectorAll('.merge-keep').forEach((b) => b.classList.remove('chosen'));
-          btn.classList.add('chosen');
-        };
-      });
-    }
+    const row = h(`<div class="merge-row">
+      <div class="merge-label">${escapeHtml(f.label)}</div>
+      <div class="merge-cols">
+        <div class="merge-col"><div class="merge-side">Yours</div><div class="merge-val">${yv ? escapeHtml(yv) : '<span class="muted">—</span>'}</div><button class="btn btn-ghost xsmall merge-keep chosen" data-side="yours" ${yv ? '' : 'disabled'}>Keep</button></div>
+        <div class="merge-col"><div class="merge-side">Theirs</div><div class="merge-val">${tv ? escapeHtml(tv) : '<span class="muted">—</span>'}</div><button class="btn btn-ghost xsmall merge-keep" data-side="theirs" ${tv ? '' : 'disabled'}>Keep</button></div>
+      </div>
+      <input class="input merge-input" value="${escapeHtml(merged[f.key] || '')}" />
+    </div>`);
+    const input = row.querySelector('.merge-input');
+    input.addEventListener('input', () => { merged[f.key] = input.value; });
+    row.querySelectorAll('.merge-keep').forEach((btn) => {
+      btn.onclick = () => {
+        const v = btn.dataset.side === 'yours' ? yv : tv;
+        merged[f.key] = v; input.value = v;
+        row.querySelectorAll('.merge-keep').forEach((b) => b.classList.remove('chosen'));
+        btn.classList.add('chosen');
+      };
+    });
     rowsWrap.appendChild(row);
   });
 
@@ -1098,27 +1060,5 @@ export function askLocationPrompt(onChoice) {
 // tiny utils
 // --------------------------------------------------------------------------
 function deepCopy(o) { return JSON.parse(JSON.stringify(o)); }
-function isUrl(s) { return typeof s === 'string' && /^https?:\/\//i.test(s); }
 function firstName(n) { return ((n || '').trim().split(/\s+/)[0] || '').toLowerCase(); }
 function lastTs(c) { return c.messages.length ? c.messages[c.messages.length - 1].ts : 0; }
-
-// Shrink an uploaded image to a small thumbnail so it fits comfortably inside
-// the encrypted notebook (relays limit how big an event can be).
-function resizeImage(file, max) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const reader = new FileReader();
-    reader.onload = () => { img.src = reader.result; };
-    reader.onerror = reject;
-    img.onload = () => {
-      const scale = Math.min(1, max / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale), hh = Math.round(img.height * scale);
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = hh;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, hh);
-      resolve(canvas.toDataURL('image/jpeg', 0.72));
-    };
-    img.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}

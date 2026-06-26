@@ -57,7 +57,7 @@ export const FOOTER_LINKS = [
   { label: 'What is Nostr?', action: 'whatIsNostr' },
   { label: 'Issues / Feature Request', action: 'issues' },
   { label: 'About WhoIsThat', url: '#' },
-  { label: 'Donate', url: '#' },
+  { label: 'Donate', action: 'donate' },
 ];
 
 // Targets for the "Issues / Feature Request" popup.
@@ -66,3 +66,6 @@ export const ISSUES_GITHUB_URL = 'https://github.com/trevthom/whoisthat';
 export const ISSUES_CONTACT_NPUB = 'npub1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
 
 
+// Donate popup details (Spark address + Strike handle).
+export const DONATE_SPARK = 'sp1qqw69pfyyvletggxcj6869wewwf6espfsruzw65wpyz7wvdnh74f0cquz0wqafetak9k5zmzyeuhg9jctalf94he5zehkt92w0zj0tja3pqryqtps';
+export const DONATE_STRIKE = 'trevort@strike.me';

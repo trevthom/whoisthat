@@ -146,6 +146,11 @@ textarea.input { min-height: 84px; resize: vertical; line-height: 1.5; }
 .key-box code { flex: 1; font-size: 12px; word-break: break-all; color: var(--ink); }
 
 .relay-status-block { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 14px; }
+.stay-checkbox { margin-top: 16px; }
+.stay-note { margin-top: 5px; }
+.relay-status-summary { font-size: 12px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .03em; }
+.relay-status-body { margin-top: 12px; }
+.relay-status-body .relay-status-head { justify-content: flex-end; margin-bottom: 8px; }
 .relay-status-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 8px; }
 .relay-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .relay-row { display: flex; align-items: center; gap: 9px; font-family: var(--font-mono); font-size: 12px; padding: 7px 4px; }
@@ -277,7 +282,6 @@ textarea.input { min-height: 84px; resize: vertical; line-height: 1.5; }
 .merge-val { font-size: 13px; word-break: break-word; min-height: 18px; }
 .merge-keep { align-self: flex-start; }
 .merge-keep.chosen { background: var(--vault); color: #fff; border-color: var(--vault); }
-.merge-photo { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; }
 .merge-input { margin-top: 9px; }
 .merge-chosen-note { font-size: 12px; color: var(--ink-soft); margin-top: 8px; }
 .merge-rel-choices { display: flex; gap: 8px; margin-top: 9px; flex-wrap: wrap; }
@@ -292,19 +296,6 @@ textarea.input { min-height: 84px; resize: vertical; line-height: 1.5; }
 .footer-osm a { color: var(--ink-soft); text-decoration: none; }
 .footer-osm a:hover { color: var(--ink); text-decoration: underline; }
 
-/* ---------- photo pins ---------- */
-/* Photo pin: a perfect circle roughly twice the diameter of the 18px standard
-   pin dot, with the photo scaled to best-fit (cover) and a small pin point. */
-.wwt-photo { position: relative; width: 38px; height: 38px; }
-.wwt-photo img {
-  width: 38px; height: 38px; box-sizing: border-box; border-radius: 50%;
-  object-fit: cover; object-position: center; display: block;
-  border: 3px solid var(--pin); box-shadow: 0 2px 6px rgba(0,0,0,.4); background: var(--surface);
-}
-.wwt-photo::after { content: ''; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 10px solid var(--pin); }
-.wwt-pin-self .wwt-photo img { border-color: var(--vault); }
-.wwt-pin-self .wwt-photo::after { border-top-color: var(--vault); }
-
 /* ---------- "N pins" cluster marker ---------- */
 .wwt-cluster-dot {
   width: 30px; height: 30px; border-radius: 50%; background: var(--pin); color: #fff;
@@ -316,6 +307,12 @@ textarea.input { min-height: 84px; resize: vertical; line-height: 1.5; }
 .info-modal p { margin: 0 0 14px; line-height: 1.55; font-size: 14px; }
 .info-modal p:last-child { margin-bottom: 0; }
 .info-modal b { font-weight: 700; color: var(--ink); }
+/* Donate popup — everything centered, blank lines between each part. */
+.donate-body { text-align: center; }
+.donate-title { font-weight: 700; font-size: 16px; margin: 4px 0 20px; }
+.donate-addr { font-size: 12px; line-height: 1.55; word-break: break-all; margin: 0 0 20px; cursor: pointer; }
+.donate-strike { font-size: 15px; margin: 0; cursor: pointer; }
+.donate-addr:hover, .donate-strike:hover { color: var(--vault); }
 .issues-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
 a.btn { text-decoration: none; }
 .btn.block { display: flex; align-items: center; justify-content: center; }

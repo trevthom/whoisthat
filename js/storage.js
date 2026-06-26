@@ -16,11 +16,11 @@ import {
 
 // Load the notebook for the logged-in user. If none exists yet (new account),
 // the current empty dataset is kept. Returns true if existing data was loaded.
+// Load the newest saved notebook for the logged-in user. Returns the decrypted
+// dataset object, or null if none exists. It does NOT commit to state — the
+// caller decides whether to apply it (so a superseded login can be discarded).
 export async function loadDataset() {
   const { pubkey } = getState();
-  // Query every relay and keep the NEWEST copy. (A single-event fetch can come
-  // back from whichever relay answers first, which might be a stale one — so we
-  // gather them all and pick the latest by timestamp.)
   const filter = { kinds: [KIND.APP_DATA], authors: [pubkey], '#d': [DATASET_TAG] };
   let events = [];
   try { events = await fetchMany(filter); } catch { events = []; }
@@ -28,17 +28,15 @@ export async function loadDataset() {
     const one = await fetchLatest(filter);   // fallback
     if (one) events = [one];
   }
-  if (!events.length) return false;
+  if (!events.length) return null;
   const event = events.reduce((a, b) => (b.created_at > a.created_at ? b : a));
-  if (!event || !event.content) return false;
+  if (!event || !event.content) return null;
   lastWriteAt = Math.max(lastWriteAt, event.created_at);   // never write older than what exists
 
   try {
     const json = decryptFromSelf(event.content);
     const data = JSON.parse(json);
-    const merged = mergeDataset(data);
-    setState({ dataset: merged });
-    return true;
+    return mergeDataset(data);
   } catch (e) {
     console.error('Could not read existing notebook:', e);
     throw new Error('Found saved data but could not decrypt it. Is this the right key?');
@@ -125,6 +123,12 @@ function mergeDataset(data) {
   if (!Array.isArray(out.people)) out.people = [];
   if (!Array.isArray(out.handledShares)) out.handledShares = [];
   if (!Array.isArray(out.sharedWith)) out.sharedWith = [];
+
+  // Photos were removed from the app. Drop any that linger in older saved data so
+  // the encrypted blob shrinks and can't grow past a relay's size limit. They
+  // disappear from the stored copy on the next save.
+  if (out.self && out.self.picture) delete out.self.picture;
+  for (const p of out.people) { if (p && p.picture) delete p.picture; }
   // If the saved relay list is empty for any reason, fall back to current.
   if (!out.settings.relays || out.settings.relays.length === 0) {
     out.settings.relays = getState().dataset.settings.relays;

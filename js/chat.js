@@ -152,22 +152,11 @@ async function sendWrapped(peerHex, content) {
   return rumorId;
 }
 
-// Send a shared-card packet (used by cards.js). Returns once published.
-export async function sendShareCard(peerHex, packet) {
-  const rumorId = await sendWrapped(peerHex, packet);
-  return rumorId;
-}
-
 export function openConversation(peerHex) {
   const convs = { ...getState().conversations };
   if (!convs[peerHex]) convs[peerHex] = { messages: [], unread: 0 };
   convs[peerHex].unread = 0;
   setState({ conversations: convs, activeChatPeer: peerHex });
-}
-
-export function markRead(peerHex) {
-  const convs = { ...getState().conversations };
-  if (convs[peerHex]) { convs[peerHex].unread = 0; setState({ conversations: convs }); }
 }
 
 export function totalUnread() {

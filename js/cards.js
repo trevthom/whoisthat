@@ -1,7 +1,7 @@
 // ============================================================================
 // cards.js  —  The "cards" you keep about people (and yourself).
 // ============================================================================
-// A card is just a plain object with the fields from the brief: name, picture,
+// A card is just a plain object with the fields from the brief: name,
 // birthday, pets, children, relatives, where you know them from, notes, and a
 // pinned location. This file creates, edits, deletes, and shares cards. Saving
 // to the network is handled by storage.js — here we only change the data and
@@ -28,7 +28,6 @@ export function emptyCard() {
     id: cryptoId(),
     name: '',
     npub: '',             // their Nostr public key, if you know it (enables chat/share)
-    picture: '',          // small base64 thumbnail or an image URL
     birthday: '',
     pets: '',
     relatives: [],        // [{ type, name, npub, lat, lng, address }] — includes children
@@ -99,6 +98,7 @@ async function sendSelfTo(npub) {
     sharedBy: getState().npub,
     createdAt: Math.floor(Date.now() / 1000),
   };
+  delete payloadCard.picture;       // photos are no longer used; keep the packet small
   const body = JSON.stringify({ marker: SHARE_MARKER, card: payloadCard });
   const { wraps } = buildDM17(peerHex, body);
   const results = await Promise.allSettled(wraps.map((w) => publish(w)));
@@ -156,10 +156,10 @@ export function applyIncomingShare(card, fromNpub) {
   updated.location = incoming.location || null;
   updated.address = incoming.address || '';
 
-  // name / pets / photo: take theirs automatically if you have nothing there;
-  // if you both have data and it differs, that's a conflict for you to resolve.
+  // name / pets: take theirs automatically if you have nothing there; if you
+  // both have data and it differs, that's a conflict for you to resolve.
   const conflicts = {};
-  for (const f of ['name', 'pets', 'picture']) {
+  for (const f of ['name', 'pets']) {
     if (!match[f]) {
       updated[f] = incoming[f] || match[f] || '';
     } else if (incoming[f] && incoming[f] !== match[f]) {

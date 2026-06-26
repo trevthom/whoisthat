@@ -2,10 +2,11 @@
 
 A private, encrypted map of the people you've met — and where you know them from.
 Everything you save is encrypted with your own key and stored **only** on the
-Nostr relays you choose. Your notebook data is never stored on the device; the
-only thing kept locally is your key, so a refresh keeps you logged in (clear it
-any time with "Log out"). Log in on another computer or phone with the same key
-and your whole notebook comes back.
+Nostr relays you choose. Your notebook data is never stored on the device. By
+default you paste your key each time you open the app; you can opt in to "Keep me
+logged in on this device" at login, which stores your key in the browser so a
+refresh keeps you in (clear it any time with "Log out"). Log in on another
+computer or phone with the same key and your whole notebook comes back.
 
 Currently deployed at https://whoisthat-ungu.vercel.app/
 
@@ -17,7 +18,7 @@ Currently deployed at https://whoisthat-ungu.vercel.app/
   you already have (`nsec…`). That key *is* your account — there's no email,
   password, or server sign-up.
 - **A map of people.** Drop a pin on OpenStreetMap for anyone you've met and
-  keep a card on them: name, photo, birthday, pets, relatives and children (each
+  keep a card on them: name, birthday, pets, relatives and children (each
   with their own optional pin), where you know them from, and free-form notes.
 - **Your own card.** Pin yourself and fill in the same details, then **share**
   that card with someone by their `npub`. It lands on *their* map automatically,
@@ -135,12 +136,13 @@ are bugs.
    static, server-free Nostr app can't include. The in-app red unread bubble
    always works, and you'll always see new messages when you open the app.
 
-2. **Staying logged in.** To keep you logged in across page refreshes, the app
-   remembers your key in this browser's local storage on this device. That's a
-   convenience trade-off: it means your key sits on the device until you press
-   "Log out" (which erases it). On a shared or public computer, log out when
-   you're done. Your notebook data itself always lives encrypted on the relays —
-   this only remembers the key locally.
+2. **Staying logged in is opt-in.** By default the app keeps nothing on the
+   device, so you paste your key each time. If you tick **"Keep me logged in on
+   this device"** at login, your key is stored in this browser's local storage so
+   refreshes keep you in — until you press "Log out" (which erases it). Only do
+   this on a device that's yours; on a shared or public computer, leave it off.
+   Your notebook data itself always lives encrypted on the relays — this only
+   ever remembers the key locally, and only if you ask it to.
 
 3. **Deleting your account is best-effort.** "Delete account" overwrites your
    notebook on the relays with an empty one and logs you out. But: a Nostr key
@@ -153,13 +155,7 @@ are bugs.
    background helper are disabled by browsers on insecure pages. Use one of the
    hosting options above.
 
-5. **Photos are shrunk to thumbnails.** Because your whole notebook is saved as a
-   single encrypted item and relays cap how big that can be, uploaded photos are
-   automatically resized small. A very large number of photos could still bump
-   into a relay's size limit; if that ever happens, removing a few photos fixes
-   it.
-
-6. **You alone hold the key.** There is no "forgot password." If you lose your
+5. **You alone hold the key.** There is no "forgot password." If you lose your
    `nsec`, no one — not us, not the relays — can recover your notebook. Save it
    somewhere safe (a password manager is ideal).
 

@@ -189,8 +189,37 @@ function locateOrWarn() {
 // --------------------------------------------------------------------------
 // Entering the app (used by both "new identity" and "log in")
 // --------------------------------------------------------------------------
+let enterToken = 0;
+
+// Log in with EXACTLY the key the user specified. This wipes any leftover
+// in-memory account first, supersedes a stay-logged-in restore that might be
+// mid-flight, and opens fresh relay connections — so whatever key you type or
+// generate is the one you end up in, on any device.
+function doLogin(key) {
+  enterToken++;                                  // supersede any in-flight auto-login
+  // Validate the key BEFORE tearing anything down (throws on a bad key).
+  const probe = loginWithKey(key);
+  if (!probe || !probe.npub) throw new Error('That key was not accepted.');
+
+  // Preserve the relay list the user may have set on the login screen.
+  const relays = getState().dataset.settings.relays;
+  clearSession();
+  resetState();                                  // blank slate — no old identity or data
+  setState({
+    dataset: { ...getState().dataset, settings: { ...getState().dataset.settings, relays } },
+  });
+  loginWithKey(key);                             // re-assert the exact identity after the reset
+  refreshPool();                                 // fresh relay sockets for this identity
+  // Only remember the key on this device if the user opted in. Otherwise make
+  // sure nothing is left behind (the key never touches storage).
+  const stay = !!(document.getElementById('stay-logged-in') && document.getElementById('stay-logged-in').checked);
+  if (stay) saveSession(); else clearSession();
+  enterApp();
+}
 async function enterApp() {
   hideLoginError();
+  const myToken = ++enterToken;             // a later login supersedes this one
+  const myPubkey = getState().pubkey;
   setState({ screen: 'app' });
   ui.showScreen('app');
 
@@ -201,14 +230,19 @@ async function enterApp() {
   ui.applyTheme(startTheme);
 
   // Pull the encrypted notebook down from the relays (if one exists).
+  let loaded;
   try {
-    await loadDataset();
+    loaded = await loadDataset();
   } catch (e) {
-    // Data exists but couldn't be decrypted — almost always the wrong key.
+    if (myToken !== enterToken) return;     // a newer login took over while we waited
     ui.toast(e.message || 'Could not open your saved data', true);
     await doLogout(false);
     return;
   }
+  // If another login started while we were fetching, abandon this one entirely
+  // so we never apply the wrong account's data.
+  if (myToken !== enterToken || getState().pubkey !== myPubkey) return;
+  if (loaded) setState({ dataset: loaded });
 
   const ds = getState().dataset;
   ui.applyTheme(ds.settings.theme);   // honour the theme saved in the notebook
@@ -320,8 +354,12 @@ function wireLogin() {
     $('btn-enter-new').disabled = !e.target.checked;
   });
 
-  // Enter the app with the freshly generated identity
-  $('btn-enter-new').addEventListener('click', () => { saveSession(); enterApp(); });
+  // Enter the app with the freshly generated identity.
+  $('btn-enter-new').addEventListener('click', () => {
+    if (!generatedNsec) { showLoginError('Generate a key first.'); return; }
+    try { doLogin(generatedNsec); }
+    catch (e) { showLoginError(e.message || 'Could not start your new account.'); }
+  });
 
   // Show/hide the secret key field on the "I have a key" tab
   $('btn-toggle-nsec').addEventListener('click', () => {
@@ -334,13 +372,8 @@ function wireLogin() {
   // Log in with an existing key
   $('btn-login-existing').addEventListener('click', () => {
     const val = $('nsec-input').value;
-    try {
-      loginWithKey(val);
-      saveSession();
-      enterApp();
-    } catch (e) {
-      showLoginError(e.message || 'That key was not accepted.');
-    }
+    try { doLogin(val); }
+    catch (e) { showLoginError(e.message || 'That key was not accepted.'); }
   });
   $('nsec-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-login-existing').click(); });
 
