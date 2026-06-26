@@ -7,6 +7,8 @@ only thing kept locally is your key, so a refresh keeps you logged in (clear it
 any time with "Log out"). Log in on another computer or phone with the same key
 and your whole notebook comes back.
 
+Currently deployed at https://whoisthat-ungu.vercel.app/
+
 ---
 
 ## What it does
