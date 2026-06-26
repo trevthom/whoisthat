@@ -1,0 +1,19 @@
+{
+  "name": "WhoIsThat",
+  "short_name": "WhoIsThat",
+  "description": "A private, encrypted map of the people you've met — and where.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0D1218",
+  "theme_color": "#0D1218",
+  "icons": [
+    {
+      "src": "./icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
