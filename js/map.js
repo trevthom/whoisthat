@@ -158,15 +158,6 @@ export function renderPins(dataset, onSelect, onCluster) {
       addPersonMarker(p, 'person', () => onSelect(p.id));
     }
   }
-
-  // Relatives with their own pin (small amber dot).
-  for (const p of dataset.people) {
-    for (const r of p.relatives || []) {
-      if (r.lat != null && r.lng != null) {
-        addMarker({ lat: r.lat, lng: r.lng }, `${r.name || 'Relative'} (${r.type})`, 'relative', () => onSelect(p.id));
-      }
-    }
-  }
 }
 
 // A person pin: a coloured teardrop dot with a name label underneath.
@@ -194,21 +185,6 @@ function addClusterMarker(loc, count, onClick) {
              <span class="wwt-pin-label">${count} pins</span>
            </div>`,
     iconSize: [0, 0], iconAnchor: [0, 0],
-  });
-  const m = L.marker([loc.lat, loc.lng], { icon });
-  m.on('click', onClick);
-  m.addTo(markersLayer);
-}
-
-function addMarker(loc, label, kind, onClick) {
-  const icon = L.divIcon({
-    className: '',
-    html: `<div class="wwt-pin wwt-pin-${kind}" title="${escapeHtml(label)}">
-             <span class="wwt-pin-dot"></span>
-             <span class="wwt-pin-label">${escapeHtml(label)}</span>
-           </div>`,
-    iconSize: [0, 0],
-    iconAnchor: [0, 0],
   });
   const m = L.marker([loc.lat, loc.lng], { icon });
   m.on('click', onClick);

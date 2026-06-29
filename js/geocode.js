@@ -11,6 +11,7 @@
 // ----------------------------------------------------------------------------
 
 const ENDPOINT = 'https://nominatim.openstreetmap.org/search';
+const REVERSE_ENDPOINT = 'https://nominatim.openstreetmap.org/reverse';
 
 // Look up an address. Returns an array of { lat, lng, address } (best first).
 export async function searchAddress(query) {
@@ -25,4 +26,18 @@ export async function searchAddress(query) {
     lng: +(+r.lon).toFixed(6),
     address: r.display_name,
   }));
+}
+
+// Reverse-geocode coordinates to a human-readable address, or null if none is
+// found (e.g. a pin dropped in the middle of a field). Never throws.
+export async function reverseGeocode(lat, lng) {
+  try {
+    const url = `${REVERSE_ENDPOINT}?format=jsonv2&zoom=18&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`;
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data && data.display_name) ? data.display_name : null;
+  } catch {
+    return null;
+  }
 }

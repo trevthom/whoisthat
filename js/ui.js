@@ -14,7 +14,7 @@ import { hexToNpub, isValidNpub, getNsec } from './nostr.js';
 import * as map from './map.js';
 import { totalUnread } from './chat.js';
 import { FOOTER_LINKS, ISSUES_GITHUB_URL, ISSUES_CONTACT_NPUB, DONATE_SPARK, DONATE_STRIKE } from './config.js';
-import { searchAddress } from './geocode.js';
+import { searchAddress, reverseGeocode } from './geocode.js';
 
 let A = {};                 // actions, injected by app.js
 let editorDraft = null;     // the card currently being edited (survives pin-picking)
@@ -160,6 +160,33 @@ function initials(name) {
   return n.split(/\s+/).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
 }
 function shortNpub(npub) { return npub ? npub.slice(0, 12) + '…' + npub.slice(-6) : ''; }
+
+// Does this relative have their own person card? Matches by npub, or by name at
+// the same spot (the same rule used when relatives are turned into cards).
+function findRelativeCard(r) {
+  const people = getState().dataset.people || [];
+  const near = (a, b) => Math.abs(a - b) < 1e-6;
+  return people.find((p) =>
+    (r.npub && p.npub && p.npub === r.npub) ||
+    (r.lat != null && r.name && p.name && p.location &&
+      p.name.toLowerCase() === r.name.toLowerCase() &&
+      near(p.location.lat, r.lat) && near(p.location.lng, r.lng))
+  ) || null;
+}
+
+// The display name for a chat peer, if their npub matches someone on your map
+// (a person card or your own card). Returns null when they're not on the map.
+function nameForNpub(npub) {
+  if (!npub) return null;
+  const ds = getState().dataset;
+  const all = (ds.people || []).concat(ds.self ? [ds.self] : []);
+  const p = all.find((x) => x.npub && x.npub === npub && x.name);
+  return p ? p.name : null;
+}
+function nameForHex(hex) {
+  let npub; try { npub = hexToNpub(hex); } catch { return null; }
+  return nameForNpub(npub);
+}
 function fmtTime(ts) {
   const d = new Date(ts * 1000);
   return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -245,12 +272,12 @@ export function closePanel() {
   if (!$('modal-root').hasChildNodes()) $('overlay').classList.add('hidden');
   A.onPanelClosed && A.onPanelClosed();
 }
-export function openModal(node) {
+export function openModal(node, onDismiss) {
   const root = $('modal-root');
   root.innerHTML = '';
   const scrim = h('<div class="modal-scrim"></div>');
   scrim.appendChild(node);
-  scrim.addEventListener('click', (e) => { if (e.target === scrim) closeModal(); });
+  scrim.addEventListener('click', (e) => { if (e.target === scrim) { if (onDismiss) onDismiss(); else closeModal(); } });
   root.appendChild(scrim);
 }
 export function closeModal() {
@@ -258,6 +285,13 @@ export function closeModal() {
   const panel = $('panel');
   if (!panel || panel.classList.contains('hidden')) { const ov = $('overlay'); if (ov) ov.classList.add('hidden'); }
 }
+
+export function showLoading(text) {
+  const el = $('app-loading'); if (!el) return;
+  const t = $('app-loading-text'); if (t) t.textContent = text || 'Loading…';
+  el.classList.remove('hidden');
+}
+export function hideLoading() { const el = $('app-loading'); if (el) el.classList.add('hidden'); }
 
 // --------------------------------------------------------------------------
 // Confirm dialog
@@ -353,8 +387,7 @@ export function openCardView(idOrSelf) {
   if (card.location) {
     body.appendChild(h(card.address
       ? `<div class="card-loc">
-           <div class="card-loc-line">📍 ${escapeHtml(card.address)}</div>
-           <div class="card-loc-line card-loc-coord">(${card.location.lat}, ${card.location.lng})</div>
+           <div class="card-loc-line">📍 ${escapeHtml(card.address)} <span class="card-loc-coord">(${card.location.lat}, ${card.location.lng})</span></div>
          </div>`
       : `<div class="card-loc">
            <div class="card-loc-line">📍 ${card.location.lat}, ${card.location.lng}</div>
@@ -369,15 +402,36 @@ export function openCardView(idOrSelf) {
   detail('Notes', card.notes);
 
   if ((card.relatives || []).length) {
+    const ownerId = isSelf ? 'self' : card.id;
     const wrap = h('<div class="detail"><div class="k">Relatives &amp; children</div></div>');
-    for (const r of card.relatives) {
-      wrap.appendChild(h(`<div class="rel-line">
-        <span class="rel-type">${escapeHtml(r.type)}</span>
-        <span class="v">${escapeHtml(r.name || '—')}</span>
-        ${r.npub ? `<span class="rel-npub">${escapeHtml(shortNpub(r.npub))}</span>` : ''}
-        ${(r.lat != null) ? `<span class="coord">📍 ${r.lat}, ${r.lng}</span>` : ''}
-      </div>`));
-    }
+    card.relatives.forEach((r, idx) => {
+      const hasLoc = (r.lat != null && r.lng != null);
+      const hasNpub = r.npub && isValidNpub(r.npub);
+      const relCard = findRelativeCard(r);
+      const line = h(`<div class="rel-line">
+        <div class="rel-head">
+          <span class="rel-type">${escapeHtml(r.type)}</span>
+          <span class="v">${escapeHtml(r.name || '—')}</span>
+          ${r.npub ? `<span class="rel-npub">${escapeHtml(shortNpub(r.npub))}</span>` : ''}
+        </div>
+        <div class="rel-actions">
+          ${relCard ? `<button class="btn btn-ghost xsmall rel-act-card">Show card</button>` : ''}
+          ${hasLoc ? `<button class="btn btn-ghost xsmall rel-act-map">Show on map</button>` : ''}
+          ${hasNpub ? `<button class="btn btn-ghost xsmall rel-act-msg">Send message</button>` : ''}
+          <button class="btn btn-ghost xsmall rel-act-remove">Remove relationship</button>
+        </div>
+      </div>`);
+      if (relCard) line.querySelector('.rel-act-card').onclick = () => { closeModal(); openCardView(relCard.id); };
+      if (hasLoc) line.querySelector('.rel-act-map').onclick = () => { closeModal(); map.panTo(r.lat, r.lng); };
+      if (hasNpub) line.querySelector('.rel-act-msg').onclick = () => { closeModal(); A.openChatWith(r.npub); };
+      line.querySelector('.rel-act-remove').onclick = () => confirm({
+        title: 'Remove relationship?',
+        message: `This removes <b>${escapeHtml(r.name || 'this relative')}</b> as a relationship on this card. Their own pin and card (if any) stay.`,
+        confirmLabel: 'Remove', danger: true,
+        onConfirm: () => { closeModal(); A.removeRelative(ownerId, idx); },
+      });
+      wrap.appendChild(line);
+    });
     body.appendChild(wrap);
   }
 
@@ -388,7 +442,7 @@ export function openCardView(idOrSelf) {
     foot.appendChild(view);
   }
   if (!isSelf && card.npub && isValidNpub(card.npub)) {
-    const msg = h('<button class="btn btn-ghost">Message</button>');
+    const msg = h('<button class="btn btn-ghost">Send message</button>');
     msg.onclick = () => { closeModal(); A.openChatWith(card.npub); };
     foot.appendChild(msg);
   }
@@ -443,14 +497,16 @@ function renderEditor() {
         </div>
       </div>
 
+      ${editorIsSelf ? '' : `
       <label class="field-label">Their npub (optional — lets you chat & share)</label>
-      <input id="ed-npub" class="input mono" value="${escapeHtml(c.npub || '')}" placeholder="npub1…" />
+      <input id="ed-npub" class="input mono" value="${escapeHtml(c.npub || '')}" placeholder="npub1…" />`}
 
       <label class="field-label">Pets</label>
       <input id="ed-pets" class="input" value="${escapeHtml(c.pets)}" placeholder="e.g. dog, Rex" />
 
+      ${editorIsSelf ? '' : `
       <label class="field-label">Where you know them from</label>
-      <input id="ed-knownfrom" class="input" value="${escapeHtml(c.knownFrom)}" placeholder="e.g. conference, gym, neighbour" />
+      <input id="ed-knownfrom" class="input" value="${escapeHtml(c.knownFrom)}" placeholder="e.g. conference, gym, neighbour" />`}
 
       <label class="field-label">General notes</label>
       <textarea id="ed-notes" class="input" placeholder="Anything you want to remember">${escapeHtml(c.notes)}</textarea>
@@ -508,16 +564,18 @@ function renderEditor() {
 // each with its own pin icon.
 function locationStatusHtml(c) {
   if (!c.location) return 'No location set';
-  const coords = `📍 <span class="mono xsmall">${c.location.lat}, ${c.location.lng}</span>`;
-  return c.address
-    ? `<div>📍 ${escapeHtml(c.address)}</div><div class="loc-coord-spaced">${coords}</div>`
-    : coords;
+  if (c.address) {
+    return `📍 ${escapeHtml(c.address)} <span class="mono xsmall">(${c.location.lat}, ${c.location.lng})</span>`;
+  }
+  return `📍 <span class="mono xsmall">${c.location.lat}, ${c.location.lng}</span>`;
 }
 
 function relLocationHtml(r) {
   if (r.lat == null) return 'No location';
-  const coords = `📍 <span class="mono xsmall">${r.lat}, ${r.lng}</span>`;
-  return r.address ? `📍 ${escapeHtml(r.address)}<br>${coords}` : coords;
+  if (r.address) {
+    return `📍 ${escapeHtml(r.address)} <span class="mono xsmall">(${r.lat}, ${r.lng})</span>`;
+  }
+  return `📍 <span class="mono xsmall">${r.lat}, ${r.lng}</span>`;
 }
 
 function renderRelatives(wrap, node) {
@@ -565,10 +623,12 @@ function captureEditorForm(node) {
   const d = deepCopy(editorDraft);
   const val = (sel) => { const e = node.querySelector(sel); return e ? e.value.trim() : ''; };
   d.name = val('#ed-name');
-  d.npub = val('#ed-npub');
   d.birthday = val('#ed-birthday');
   d.pets = val('#ed-pets');
-  d.knownFrom = val('#ed-knownfrom');
+  // npub and "where you know them from" aren't shown on your own card, so only
+  // overwrite them when their inputs are actually present.
+  const npubEl = node.querySelector('#ed-npub'); if (npubEl) d.npub = npubEl.value.trim();
+  const knownEl = node.querySelector('#ed-knownfrom'); if (knownEl) d.knownFrom = knownEl.value.trim();
   d.notes = node.querySelector('#ed-notes') ? node.querySelector('#ed-notes').value : d.notes;
   // relatives text fields (lat/lng/address already preserved in the draft copy)
   node.querySelectorAll('.rel-block').forEach((block) => {
@@ -709,7 +769,7 @@ function chooseLocation({ title, onResult }) {
     results.innerHTML = '<div class="muted small">Searching…</div>';
     try {
       const list = await searchAddress(q);
-      if (!list.length) { results.innerHTML = '<div class="muted small">No matches. Try a simpler address, or place a pin manually.</div>'; return; }
+      if (!list.length) { results.innerHTML = noMatchHtml(); return; }
       results.innerHTML = '';
       list.forEach((r) => {
         const item = h(`<button class="addr-item"></button>`);
@@ -727,11 +787,12 @@ function chooseLocation({ title, onResult }) {
   node.querySelector('#addr-manual').onclick = () => {
     closeModal();
     startPick('Tap the map to drop a pin',
-      (loc) => onResult({ lat: loc.lat, lng: loc.lng, address: '' }),
+      (loc) => afterManualPin(loc),
       () => onResult(null));
   };
-  node.querySelectorAll('[data-x]').forEach((b) => b.onclick = () => { closeModal(); onResult(null); });
-  openModal(node);
+  const dismiss = () => { closeModal(); onResult(null); };
+  node.querySelectorAll('[data-x]').forEach((b) => b.onclick = dismiss);
+  openModal(node, dismiss);
 
   function confirmAddress(r) {
     closeModal();
@@ -740,6 +801,38 @@ function chooseLocation({ title, onResult }) {
       () => { map.clearDraftPin(); onResult({ lat: r.lat, lng: r.lng, address: r.address }); },
       () => { map.clearDraftPin(); chooseLocation({ title, onResult }); }); // back to search
   }
+
+  // After a manual pin, see if it lands on a known address and let the user
+  // confirm it, type a different one, or just keep the coordinates.
+  async function afterManualPin(loc) {
+    const coords = { lat: loc.lat, lng: loc.lng };
+    let address = null;
+    try { address = await reverseGeocode(loc.lat, loc.lng); } catch { address = null; }
+    if (!address) { onResult({ ...coords, address: '' }); return; }
+
+    const m = h(`<div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head"><h2>Is this the address?</h2><button class="x-btn" data-x>×</button></div>
+      <div class="modal-body">
+        <p class="muted small">Your pin looks like it's at:</p>
+        <div class="addr-found">📍 ${escapeHtml(address)}</div>
+        <div class="addr-choice">
+          <button class="btn btn-primary block" id="pin-use-addr">Use this address</button>
+          <button class="btn btn-ghost block" id="pin-diff-addr">Enter a different address</button>
+          <button class="btn btn-ghost block" id="pin-coords">Use coordinates only</button>
+        </div>
+      </div>
+    </div>`);
+    m.querySelector('#pin-use-addr').onclick = () => { closeModal(); onResult({ ...coords, address }); };
+    m.querySelector('#pin-diff-addr').onclick = () => { closeModal(); chooseLocation({ title, onResult }); };
+    m.querySelector('#pin-coords').onclick = () => { closeModal(); onResult({ ...coords, address: '' }); };
+    m.querySelectorAll('[data-x]').forEach((b) => b.onclick = () => { closeModal(); onResult({ ...coords, address: '' }); });
+    openModal(m);
+  }
+}
+
+// Shown when an address search finds nothing. Encourages OSM contribution.
+function noMatchHtml() {
+  return `<div class="muted small no-match">Couldn't find that address. If it's correct, it may not be on <a href="https://www.openstreetmap.org/" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> yet — consider adding it there. Or place a pin manually below.</div>`;
 }
 
 // New-person flow: choose a location (address or pin) FIRST, then fill details.
@@ -831,20 +924,28 @@ export function openChatPanel(peerHexToOpen) {
   };
   body.appendChild(starter);
 
-  const peers = Object.keys(state.conversations);
+  const peers = Object.keys(state.conversations)
+    .map((hex) => ({ hex, c: state.conversations[hex], name: nameForHex(hex) }))
+    .sort((a, b) => lastTs(b.c) - lastTs(a.c));
+
   if (peers.length === 0) {
     body.appendChild(h('<div class="empty-state"><p>No conversations yet. Paste someone\'s npub above to start one.</p></div>'));
   } else {
-    const list = h('<div class="conv-list"></div>');
-    peers
-      .map((hex) => ({ hex, c: state.conversations[hex] }))
-      .sort((a, b) => lastTs(b.c) - lastTs(a.c))
-      .forEach(({ hex, c }) => {
+    const onMap = peers.filter((p) => p.name);
+    const others = peers.filter((p) => !p.name);
+
+    const renderGroup = (title, arr) => {
+      if (!arr.length) return;
+      body.appendChild(h(`<div class="conv-group-head">${escapeHtml(title)}</div>`));
+      const list = h('<div class="conv-list"></div>');
+      arr.forEach(({ hex, c, name }) => {
         const last = c.messages[c.messages.length - 1];
+        const display = name || shortNpub(hexToNpub(hex));
+        const avatar = name ? initials(name) : hexToNpub(hex).slice(5, 7).toUpperCase();
         const row = h(`<div class="conv-row">
-          <div class="conv-avatar">${escapeHtml(hexToNpub(hex).slice(5, 7).toUpperCase())}</div>
+          <div class="conv-avatar">${escapeHtml(avatar)}</div>
           <div class="conv-meta">
-            <div class="who">${escapeHtml(shortNpub(hexToNpub(hex)))}</div>
+            <div class="who">${escapeHtml(display)}</div>
             <div class="last">${last ? escapeHtml((last.mine ? 'You: ' : '') + last.text) : 'No messages yet'}</div>
           </div>
           ${c.unread ? `<span class="conv-unread">${c.unread}</span>` : ''}
@@ -852,7 +953,11 @@ export function openChatPanel(peerHexToOpen) {
         row.onclick = () => A.openChatWith(hexToNpub(hex));
         list.appendChild(row);
       });
-    body.appendChild(list);
+      body.appendChild(list);
+    };
+
+    renderGroup('People on your map', onMap);
+    renderGroup('Other chats', others);
   }
 
   openPanel('Messages', body);
@@ -868,10 +973,13 @@ export function openThread(peerHex) {
 
   const panel = $('panel');
   panel.innerHTML = '';
+  const name = nameForHex(peerHex);
+  const headTop = name ? escapeHtml(name) : 'Chat';
+  const headSub = name ? `(${escapeHtml(shortNpub(npub))})` : escapeHtml(shortNpub(npub));
   const head = h(`<div class="panel-head">
     <div style="display:flex;align-items:center;gap:10px;min-width:0">
       <button class="x-btn" id="thread-back" aria-label="Back">‹</button>
-      <div style="min-width:0"><div style="font-weight:600">Chat</div><div class="chat-peer-head">${escapeHtml(shortNpub(npub))}</div></div>
+      <div style="min-width:0"><div style="font-weight:600">${headTop}</div><div class="chat-peer-head">${headSub}</div></div>
     </div>
     <button class="x-btn" id="thread-close" aria-label="Close">×</button>
   </div>`);

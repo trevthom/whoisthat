@@ -261,6 +261,14 @@ textarea.input { min-height: 84px; resize: vertical; line-height: 1.5; }
 .addr-or { display: flex; align-items: center; text-align: center; color: var(--ink-soft); font-size: 12px; margin: 14px 0 10px; }
 .addr-or::before, .addr-or::after { content: ''; flex: 1; border-top: 1px solid var(--line); }
 .addr-or span { padding: 0 10px; }
+.addr-found { background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 11px 12px; font-size: 14px; line-height: 1.5; margin: 4px 0 14px; word-break: break-word; }
+.addr-choice { display: flex; flex-direction: column; gap: 8px; }
+.no-match a { color: var(--vault); }
+.no-match { line-height: 1.5; }
+.app-loading { position: fixed; inset: 0; z-index: 4000; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 72%, transparent); backdrop-filter: blur(2px); }
+.app-loading-box { display: flex; flex-direction: column; align-items: center; gap: 14px; color: var(--ink-soft); font-size: 14px; }
+.app-loading .spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--vault); animation: wwt-spin 0.8s linear infinite; }
+@keyframes wwt-spin { to { transform: rotate(360deg); } }
 
 /* draft pin shown while confirming a searched address */
 .wwt-pin-draft .wwt-pin-dot { background: #f0b429; animation: draftpulse 1.2s ease-in-out infinite; }
@@ -376,17 +384,18 @@ a.btn { text-decoration: none; }
 .detail:last-child { border-bottom: none; }
 .detail .k { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); margin-bottom: 3px; }
 .detail .v { font-size: 15px; line-height: 1.5; white-space: pre-wrap; }
-.coord { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
 /* Card-view location: address line + coordinates beneath, same text size. */
 .card-loc { margin-top: 14px; margin-bottom: 6px; }
 .card-loc-line { font-size: 15px; line-height: 1.5; word-break: break-word; }
 .card-loc-coord { color: var(--ink-soft); font-family: var(--font-mono); }
 .npub-full { font-family: var(--font-mono); font-size: 13px; word-break: break-all; }
-.loc-coord-spaced { margin-top: 12px; }
 .shared-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .shared-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--line); border-radius: 9px; padding: 7px 10px; }
 .shared-row .url { font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
-.rel-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; padding: 6px 0; }
+.rel-line { display: flex; flex-direction: column; gap: 7px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.rel-line:last-child { border-bottom: none; }
+.rel-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.rel-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .rel-type { font-size: 11px; font-weight: 700; color: var(--vault); text-transform: uppercase; }
 .rel-npub { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); word-break: break-all; }
 
@@ -411,6 +420,8 @@ a.btn { text-decoration: none; }
 
 /* ---------- chat ---------- */
 .conv-list { display: flex; flex-direction: column; gap: 6px; }
+.conv-group-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); margin: 16px 4px 7px; }
+.conv-group-head:first-child { margin-top: 6px; }
 .conv-row { display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: var(--radius-sm); cursor: pointer; }
 .conv-row:hover { background: var(--surface-2); }
 .conv-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--surface-3); display: grid; place-items: center; font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); flex: none; }
@@ -440,7 +451,6 @@ a.btn { text-decoration: none; }
 .wwt-pin-dot { width: 18px; height: 18px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
 .wwt-pin-person .wwt-pin-dot { background: var(--pin); }
 .wwt-pin-self .wwt-pin-dot { background: var(--vault); }
-.wwt-pin-relative .wwt-pin-dot { background: #f0b429; width: 13px; height: 13px; }
 .wwt-pin-label {
   margin-top: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;
   background: var(--surface); color: var(--ink); padding: 2px 7px; border-radius: 7px;

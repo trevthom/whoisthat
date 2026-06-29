@@ -23,7 +23,8 @@ import {
 import { loadDataset, saveDataset, saveNow, wipeDataset } from './storage.js';
 import {
   addPerson, updatePerson, deletePerson as cardsDeletePerson, saveSelf, shareSelfWith,
-  applyMerge, unshareSelfFrom,
+  applyMerge, unshareSelfFrom, materializeRelatives, removeRelative as cardsRemoveRelative,
+  propagateNpub,
 } from './cards.js';
 import {
   startChat, stopChat, sendMessage, openConversation, totalUnread, setShareImportedHandler,
@@ -64,7 +65,14 @@ const A = {
     if (isSelf) saveSelf(card);
     else if (id && id !== 'new') updatePerson(id, card);
     else addPerson(card);
+    materializeRelatives(card);   // located relatives become their own pins/cards
+    propagateNpub(card);          // fill this npub into matching relatives elsewhere
     refreshPins();
+  },
+  removeRelative(ownerId, index) {
+    cardsRemoveRelative(ownerId, index);
+    refreshPins();
+    ui.openCardView(ownerId);     // reopen the card so the change is visible
   },
 
   deletePerson(id) { cardsDeletePerson(id); refreshPins(); },
@@ -228,6 +236,8 @@ async function enterApp() {
   if (!mapReady) { map.initMap('map', startTheme); mapReady = true; }
   else map.invalidate();
   ui.applyTheme(startTheme);
+  refreshPins();                 // clear any previous account's pins right away
+  ui.showLoading('Loading your notebook…');
 
   // Pull the encrypted notebook down from the relays (if one exists).
   let loaded;
@@ -235,18 +245,21 @@ async function enterApp() {
     loaded = await loadDataset();
   } catch (e) {
     if (myToken !== enterToken) return;     // a newer login took over while we waited
+    ui.hideLoading();
     ui.toast(e.message || 'Could not open your saved data', true);
     await doLogout(false);
     return;
   }
   // If another login started while we were fetching, abandon this one entirely
   // so we never apply the wrong account's data.
-  if (myToken !== enterToken || getState().pubkey !== myPubkey) return;
+  if (myToken !== enterToken || getState().pubkey !== myPubkey) { ui.hideLoading(); return; }
   if (loaded) setState({ dataset: loaded });
 
   const ds = getState().dataset;
   ui.applyTheme(ds.settings.theme);   // honour the theme saved in the notebook
+  materializeRelatives();             // ensure located relatives have their own cards/pins
   refreshPins();
+  ui.hideLoading();
 
   // Incoming shared cards. A match against someone you already pinned (same npub)
   // becomes a pending "merge"; a card they shared before auto-updates; otherwise

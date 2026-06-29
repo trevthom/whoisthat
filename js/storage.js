@@ -29,18 +29,20 @@ export async function loadDataset() {
     if (one) events = [one];
   }
   if (!events.length) return null;
-  const event = events.reduce((a, b) => (b.created_at > a.created_at ? b : a));
-  if (!event || !event.content) return null;
-  lastWriteAt = Math.max(lastWriteAt, event.created_at);   // never write older than what exists
-
-  try {
-    const json = decryptFromSelf(event.content);
-    const data = JSON.parse(json);
-    return mergeDataset(data);
-  } catch (e) {
-    console.error('Could not read existing notebook:', e);
-    throw new Error('Found saved data but could not decrypt it. Is this the right key?');
+  // Newest first; use the first one that actually decrypts. (A relay could hand
+  // back a stale or corrupt event; we shouldn't fail the whole load over it.)
+  events.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+  for (const event of events) {
+    if (!event || !event.content) continue;
+    try {
+      const data = JSON.parse(decryptFromSelf(event.content));
+      lastWriteAt = Math.max(lastWriteAt, event.created_at || 0);
+      return mergeDataset(data);
+    } catch (e) {
+      // try the next (older) copy
+    }
   }
+  throw new Error('Found saved data but could not decrypt it. Is this the right key?');
 }
 
 // Save the current notebook. Debounced so a flurry of edits = one network write.

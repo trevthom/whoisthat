@@ -45,7 +45,7 @@ export function emptyRelative() {
 }
 
 export const RELATIVE_TYPES = [
-  'Parent', 'Child', 'Sibling', 'Partner', 'Spouse',
+  'Parent', 'Child', 'Sibling', 'Spouse',
   'Grandparent', 'Grandchild', 'Cousin', 'Friend', 'Colleague', 'Other',
 ];
 
@@ -64,13 +64,151 @@ export function updatePerson(id, card) {
   persist();
 }
 
+// Does relative-entry `rel` point at person `card`? Strong match: same npub, or
+// same name at the same spot.
+function relRefersTo(rel, card) {
+  if (!rel || !card) return false;
+  const near = (a, b) => Math.abs(a - b) < 1e-6;
+  if (card.npub && rel.npub) return card.npub === rel.npub;
+  if (rel.lat != null && card.location && rel.name && card.name &&
+      rel.name.toLowerCase() === card.name.toLowerCase() &&
+      near(card.location.lat, rel.lat) && near(card.location.lng, rel.lng)) return true;
+  return false;
+}
+// Looser match (also same name with no location) — used when unlinking a
+// relationship, where the back-reference has no coordinates of its own.
+function relRefersToLoose(rel, card) {
+  if (relRefersTo(rel, card)) return true;
+  return !!(rel && card && rel.name && card.name && rel.name.toLowerCase() === card.name.toLowerCase());
+}
+
+// Delete a person's card AND scrub every reference to them: their entry is
+// removed from every other card's relatives list, including your own card.
 export function deletePerson(id) {
-  updateDataset((d) => { d.people = d.people.filter((p) => p.id !== id); });
+  updateDataset((d) => {
+    const gone = d.people.find((p) => p.id === id);
+    d.people = d.people.filter((p) => p.id !== id);
+    if (!gone) return;
+    const scrub = (card) => {
+      if (card && Array.isArray(card.relatives)) {
+        card.relatives = card.relatives.filter((r) => !relRefersTo(r, gone));
+      }
+    };
+    d.people.forEach(scrub);
+    scrub(d.self);
+  });
   persist();
+}
+
+// Remove just the relationship link (keep the relative's own card/pin). Removes
+// the entry from this card and the matching back-reference from the other card.
+export function removeRelative(ownerId, index) {
+  const ds = getState().dataset;
+  const owner = ownerId === 'self' ? ds.self : (ds.people.find((p) => p.id === ownerId) || null);
+  if (!owner || !Array.isArray(owner.relatives) || !owner.relatives[index]) return;
+  const rel = { ...owner.relatives[index] };
+  updateDataset((d) => {
+    const o = ownerId === 'self' ? d.self : d.people.find((p) => p.id === ownerId);
+    if (o && Array.isArray(o.relatives)) o.relatives.splice(index, 1);
+    // Remove the reverse link on the relative's own card, if they have one.
+    const yCard = d.people.find((p) =>
+      (rel.npub && p.npub && p.npub === rel.npub) ||
+      (rel.lat != null && p.location && p.name && rel.name &&
+        p.name.toLowerCase() === rel.name.toLowerCase() &&
+        Math.abs(p.location.lat - rel.lat) < 1e-6 && Math.abs(p.location.lng - rel.lng) < 1e-6));
+    if (yCard && Array.isArray(yCard.relatives) && o) {
+      yCard.relatives = yCard.relatives.filter((rr) => !relRefersToLoose(rr, o));
+    }
+  });
+  persist();
+}
+
+// When a card gains an npub, copy it onto matching relative entries elsewhere
+// (people who listed this person without an npub), so chat buttons light up.
+export function propagateNpub(card) {
+  if (!card || !card.npub || !card.location) return;
+  const near = (a, b) => Math.abs(a - b) < 1e-6;
+  let changed = false;
+  updateDataset((d) => {
+    const fix = (owner) => {
+      if (!owner || !Array.isArray(owner.relatives)) return;
+      for (const r of owner.relatives) {
+        if (r.npub) continue;
+        if (r.lat != null && r.name && card.name &&
+            r.name.toLowerCase() === card.name.toLowerCase() &&
+            near(r.lat, card.location.lat) && near(r.lng, card.location.lng)) {
+          r.npub = card.npub; changed = true;
+        }
+      }
+    };
+    d.people.forEach(fix);
+    fix(d.self);
+  });
+  if (changed) persist();
 }
 
 export function getPerson(id) {
   return getState().dataset.people.find((p) => p.id === id) || null;
+}
+
+// How a relationship looks from the other person's side. Used so a newly created
+// relative card lists the original person back with the matching relationship.
+// Symmetric ones (Sibling, Cousin, Spouse) map to themselves; Friend/Colleague/
+// Other have no clear inverse, so no back-reference is added for them.
+const INVERSE_RELATION = {
+  Child: 'Parent',
+  Parent: 'Child',
+  Sibling: 'Sibling',
+  Grandchild: 'Grandparent',
+  Grandparent: 'Grandchild',
+  Cousin: 'Cousin',
+  Spouse: 'Spouse',
+};
+
+// When a card lists a relative who has a known location, give that relative their
+// own pin/card on the map. De-duplicates by npub (if known) or by name+spot, so
+// re-saving doesn't pile up copies. The new card also lists the original person
+// back with the matching relationship (child↔parent, sibling, etc.). Pass a
+// single card, or omit to sweep everyone (used once at login so existing
+// relatives also appear). Returns how many were added.
+export function materializeRelatives(card) {
+  const sources = card ? [card] : getState().dataset.people.concat(getState().dataset.self ? [getState().dataset.self] : []);
+  let added = 0;
+  updateDataset((d) => {
+    const near = (a, b) => Math.abs(a - b) < 1e-6;
+    for (const parent of sources) {
+      for (const r of (parent.relatives || [])) {
+        if (r.lat == null || r.lng == null) continue;
+        if (!(r.name || r.npub)) continue;
+        const dup = d.people.some((p) =>
+          (r.npub && p.npub && p.npub === r.npub) ||
+          (p.name && r.name && p.name.toLowerCase() === r.name.toLowerCase()
+            && p.location && near(p.location.lat, r.lat) && near(p.location.lng, r.lng)));
+        if (dup) continue;
+
+        // Reciprocal entry: list the original person on the new card with the
+        // inverse relationship. No location on it (the original already has its
+        // own pin), which also keeps it from being re-materialized.
+        const inverse = INVERSE_RELATION[r.type];
+        const backRefs = (inverse && (parent.name || parent.npub))
+          ? [{ type: inverse, name: parent.name || '', npub: parent.npub || '', lat: null, lng: null, address: '' }]
+          : [];
+
+        d.people.push({
+          ...emptyCard(),
+          name: r.name || 'Relative',
+          npub: r.npub || '',
+          location: { lat: r.lat, lng: r.lng },
+          address: r.address || '',
+          knownFrom: parent && parent.name ? `Relative of ${parent.name}` : 'Relative',
+          relatives: backRefs,
+        });
+        added++;
+      }
+    }
+  });
+  if (added) persist();
+  return added;
 }
 
 // --- Your own card --------------------------------------------------------

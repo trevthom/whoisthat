@@ -8,8 +8,6 @@ logged in on this device" at login, which stores your key in the browser so a
 refresh keeps you in (clear it any time with "Log out"). Log in on another
 computer or phone with the same key and your whole notebook comes back.
 
-Currently deployed at https://whoisthat-ungu.vercel.app/
-
 ---
 
 ## What it does
